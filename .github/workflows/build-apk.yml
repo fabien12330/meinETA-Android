@@ -28,6 +28,7 @@ jobs:
       - name: Recreate Android project
         run: |
           rm -rf app
+
           mkdir -p app/src/main/java/fr/fabien/meineta
           mkdir -p app/src/main/res/values
 
@@ -76,8 +77,8 @@ jobs:
                   applicationId "fr.fabien.meineta"
                   minSdk 24
                   targetSdk 35
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode 2
+                  versionName "1.1"
               }
           }
 
@@ -109,6 +110,7 @@ jobs:
                   </activity>
 
               </application>
+
           </manifest>
           EOF
 
@@ -149,6 +151,8 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   webView = new WebView(this);
+                  webView.setInitialScale(0);
+
                   setContentView(webView);
 
                   CookieManager cookies = CookieManager.getInstance();
@@ -156,72 +160,225 @@ jobs:
                   cookies.setAcceptThirdPartyCookies(webView, true);
 
                   WebSettings settings = webView.getSettings();
+
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
                   settings.setDatabaseEnabled(true);
+
                   settings.setLoadsImagesAutomatically(true);
+
                   settings.setUseWideViewPort(true);
                   settings.setLoadWithOverviewMode(true);
+
                   settings.setSupportZoom(true);
                   settings.setBuiltInZoomControls(true);
                   settings.setDisplayZoomControls(false);
-                  settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
-                  webView.setWebChromeClient(new WebChromeClient());
+                  settings.setMixedContentMode(
+                          WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                  );
 
-                  webView.setWebViewClient(new WebViewClient() {
+                  webView.setWebChromeClient(
+                          new WebChromeClient()
+                  );
 
-                      @Override
-                      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                          return handleUri(request.getUrl());
-                      }
+                  webView.setWebViewClient(
+                          new WebViewClient() {
 
-                      @Override
-                      public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                          return handleUri(Uri.parse(url));
-                      }
+                              @Override
+                              public boolean shouldOverrideUrlLoading(
+                                      WebView view,
+                                      WebResourceRequest request) {
 
-                      @Override
-                      public void onPageFinished(WebView view, String url) {
-                          CookieManager.getInstance().flush();
-                          super.onPageFinished(view, url);
-                      }
+                                  return handleUri(
+                                          request.getUrl()
+                                  );
+                              }
 
-                      private boolean handleUri(Uri uri) {
-                          String scheme = uri.getScheme();
+                              @Override
+                              public boolean shouldOverrideUrlLoading(
+                                      WebView view,
+                                      String url) {
 
-                          if ("http".equalsIgnoreCase(scheme) ||
-                              "https".equalsIgnoreCase(scheme)) {
-                              return false;
+                                  return handleUri(
+                                          Uri.parse(url)
+                                  );
+                              }
+
+                              @Override
+                              public void onPageFinished(
+                                      WebView view,
+                                      String url) {
+
+                                  CookieManager
+                                          .getInstance()
+                                          .flush();
+
+                                  view.evaluateJavascript(
+                                          "(function() {" +
+                                          "var meta = document.querySelector('meta[name=\"viewport\"]');" +
+                                          "if (!meta) {" +
+                                          "meta = document.createElement('meta');" +
+                                          "meta.name = 'viewport';" +
+                                          "document.head.appendChild(meta);" +
+                                          "}" +
+                                          "meta.content = 'width=1024, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';" +
+                                          "document.documentElement.style.overflowX='hidden';" +
+                                          "document.body.style.overflowX='hidden';" +
+                                          "})()",
+                                          null
+                                  );
+
+                                  view.postDelayed(
+                                          new Runnable() {
+                                              @Override
+                                              public void run() {
+
+                                                  view.evaluateJavascript(
+                                                          "(function() {" +
+                                                          "var w = Math.max(" +
+                                                          "document.documentElement.scrollWidth," +
+                                                          "document.body ? document.body.scrollWidth : 0" +
+                                                          ");" +
+                                                          "return w.toString();" +
+                                                          "})()",
+                                                          value -> {
+
+                                                              try {
+
+                                                                  value = value
+                                                                          .replace("\"", "");
+
+                                                                  float pageWidth =
+                                                                          Float.parseFloat(value);
+
+                                                                  float screenWidth =
+                                                                          view.getWidth();
+
+                                                                  if (pageWidth > screenWidth &&
+                                                                      screenWidth > 0) {
+
+                                                                      float scale =
+                                                                              screenWidth /
+                                                                              pageWidth;
+
+                                                                      int percent =
+                                                                              Math.round(
+                                                                                      scale * 100
+                                                                              );
+
+                                                                      if (percent < 25) {
+                                                                          percent = 25;
+                                                                      }
+
+                                                                      if (percent > 100) {
+                                                                          percent = 100;
+                                                                      }
+
+                                                                      view.setInitialScale(
+                                                                              percent
+                                                                      );
+                                                                  }
+
+                                                              } catch (
+                                                                      Exception ignored
+                                                              ) {
+                                                              }
+                                                          }
+                                                  );
+                                              }
+                                          },
+                                          400
+                                  );
+
+                                  super.onPageFinished(
+                                          view,
+                                          url
+                                  );
+                              }
+
+                              private boolean handleUri(
+                                      Uri uri) {
+
+                                  String scheme =
+                                          uri.getScheme();
+
+                                  if ("http".equalsIgnoreCase(
+                                          scheme
+                                  ) ||
+                                      "https".equalsIgnoreCase(
+                                          scheme
+                                      )) {
+
+                                      return false;
+                                  }
+
+                                  try {
+
+                                      startActivity(
+                                              new Intent(
+                                                      Intent.ACTION_VIEW,
+                                                      uri
+                                              )
+                                      );
+
+                                  } catch (
+                                          Exception ignored
+                                  ) {
+                                  }
+
+                                  return true;
+                              }
                           }
-
-                          try {
-                              startActivity(new Intent(Intent.ACTION_VIEW, uri));
-                          } catch (Exception ignored) {
-                          }
-
-                          return true;
-                      }
-                  });
+                  );
 
                   if (savedInstanceState == null) {
-                      webView.loadUrl(START_URL);
+
+                      webView.loadUrl(
+                              START_URL
+                      );
+
                   } else {
-                      webView.restoreState(savedInstanceState);
+
+                      webView.restoreState(
+                              savedInstanceState
+                      );
                   }
               }
 
               @Override
               protected void onPause() {
-                  CookieManager.getInstance().flush();
+
+                  CookieManager
+                          .getInstance()
+                          .flush();
+
                   super.onPause();
               }
 
               @Override
+              protected void onSaveInstanceState(
+                      Bundle outState) {
+
+                  webView.saveState(
+                          outState
+                  );
+
+                  super.onSaveInstanceState(
+                          outState
+                  );
+              }
+
+              @Override
               public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
+
+                  if (webView != null &&
+                      webView.canGoBack()) {
+
                       webView.goBack();
+
                   } else {
+
                       super.onBackPressed();
                   }
               }
@@ -232,10 +389,10 @@ jobs:
         run: gradle assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk meinETA.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk meinETA-v1.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: meinETA-APK
-          path: meinETA.apk
+          name: meinETA-v1.1-APK
+          path: meinETA-v1.1.apk
