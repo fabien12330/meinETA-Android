@@ -28,7 +28,6 @@ jobs:
       - name: Recreate Android project
         run: |
           rm -rf app
-
           mkdir -p app/src/main/java/fr/fabien/meineta
           mkdir -p app/src/main/res/values
 
@@ -77,8 +76,8 @@ jobs:
                   applicationId "fr.fabien.meineta"
                   minSdk 24
                   targetSdk 35
-                  versionCode 2
-                  versionName "1.1"
+                  versionCode 3
+                  versionName "1.2"
               }
           }
 
@@ -117,11 +116,16 @@ jobs:
           cat > app/src/main/res/values/styles.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="Theme.MeinETA" parent="android:style/Theme.Material.Light.NoActionBar">
+
+              <style name="Theme.MeinETA"
+                  parent="android:style/Theme.Material.Light.NoActionBar">
+
                   <item name="android:fontFamily">sans</item>
                   <item name="android:statusBarColor">#34393D</item>
                   <item name="android:navigationBarColor">#34393D</item>
+
               </style>
+
           </resources>
           EOF
 
@@ -151,15 +155,19 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   webView = new WebView(this);
-                  webView.setInitialScale(0);
-
                   setContentView(webView);
 
-                  CookieManager cookies = CookieManager.getInstance();
-                  cookies.setAcceptCookie(true);
-                  cookies.setAcceptThirdPartyCookies(webView, true);
+                  CookieManager cookies =
+                          CookieManager.getInstance();
 
-                  WebSettings settings = webView.getSettings();
+                  cookies.setAcceptCookie(true);
+                  cookies.setAcceptThirdPartyCookies(
+                          webView,
+                          true
+                  );
+
+                  WebSettings settings =
+                          webView.getSettings();
 
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
@@ -168,7 +176,7 @@ jobs:
                   settings.setLoadsImagesAutomatically(true);
 
                   settings.setUseWideViewPort(true);
-                  settings.setLoadWithOverviewMode(true);
+                  settings.setLoadWithOverviewMode(false);
 
                   settings.setSupportZoom(true);
                   settings.setBuiltInZoomControls(true);
@@ -214,81 +222,9 @@ jobs:
                                           .getInstance()
                                           .flush();
 
-                                  view.evaluateJavascript(
-                                          "(function() {" +
-                                          "var meta = document.querySelector('meta[name=\"viewport\"]');" +
-                                          "if (!meta) {" +
-                                          "meta = document.createElement('meta');" +
-                                          "meta.name = 'viewport';" +
-                                          "document.head.appendChild(meta);" +
-                                          "}" +
-                                          "meta.content = 'width=1024, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';" +
-                                          "document.documentElement.style.overflowX='hidden';" +
-                                          "document.body.style.overflowX='hidden';" +
-                                          "})()",
-                                          null
-                                  );
-
                                   view.postDelayed(
-                                          new Runnable() {
-                                              @Override
-                                              public void run() {
-
-                                                  view.evaluateJavascript(
-                                                          "(function() {" +
-                                                          "var w = Math.max(" +
-                                                          "document.documentElement.scrollWidth," +
-                                                          "document.body ? document.body.scrollWidth : 0" +
-                                                          ");" +
-                                                          "return w.toString();" +
-                                                          "})()",
-                                                          value -> {
-
-                                                              try {
-
-                                                                  value = value
-                                                                          .replace("\"", "");
-
-                                                                  float pageWidth =
-                                                                          Float.parseFloat(value);
-
-                                                                  float screenWidth =
-                                                                          view.getWidth();
-
-                                                                  if (pageWidth > screenWidth &&
-                                                                      screenWidth > 0) {
-
-                                                                      float scale =
-                                                                              screenWidth /
-                                                                              pageWidth;
-
-                                                                      int percent =
-                                                                              Math.round(
-                                                                                      scale * 100
-                                                                              );
-
-                                                                      if (percent < 25) {
-                                                                          percent = 25;
-                                                                      }
-
-                                                                      if (percent > 100) {
-                                                                          percent = 100;
-                                                                      }
-
-                                                                      view.setInitialScale(
-                                                                              percent
-                                                                      );
-                                                                  }
-
-                                                              } catch (
-                                                                      Exception ignored
-                                                              ) {
-                                                              }
-                                                          }
-                                                  );
-                                              }
-                                          },
-                                          400
+                                          () -> fitEtaToScreen(view),
+                                          700
                                   );
 
                                   super.onPageFinished(
@@ -303,12 +239,9 @@ jobs:
                                   String scheme =
                                           uri.getScheme();
 
-                                  if ("http".equalsIgnoreCase(
-                                          scheme
-                                  ) ||
-                                      "https".equalsIgnoreCase(
-                                          scheme
-                                      )) {
+                                  if ("http".equalsIgnoreCase(scheme)
+                                          ||
+                                      "https".equalsIgnoreCase(scheme)) {
 
                                       return false;
                                   }
@@ -322,9 +255,7 @@ jobs:
                                               )
                                       );
 
-                                  } catch (
-                                          Exception ignored
-                                  ) {
+                                  } catch (Exception ignored) {
                                   }
 
                                   return true;
@@ -344,6 +275,43 @@ jobs:
                               savedInstanceState
                       );
                   }
+              }
+
+              private void fitEtaToScreen(WebView view) {
+
+                  String javascript =
+                      "(function() {" +
+
+                      "document.body.style.zoom='1';" +
+
+                      "var contentWidth=Math.max(" +
+                      "document.documentElement.scrollWidth," +
+                      "document.body.scrollWidth" +
+                      ");" +
+
+                      "var screenWidth=document.documentElement.clientWidth;" +
+
+                      "if(contentWidth>screenWidth){" +
+
+                      "var scale=screenWidth/contentWidth;" +
+
+                      "if(scale<0.45) scale=0.45;" +
+                      "if(scale>1) scale=1;" +
+
+                      "document.body.style.transformOrigin='top left';" +
+                      "document.body.style.zoom=scale;" +
+
+                      "document.documentElement.style.overflowX='hidden';" +
+                      "document.body.style.overflowX='hidden';" +
+
+                      "}" +
+
+                      "})();";
+
+                  view.evaluateJavascript(
+                          javascript,
+                          null
+                  );
               }
 
               @Override
@@ -372,7 +340,8 @@ jobs:
               @Override
               public void onBackPressed() {
 
-                  if (webView != null &&
+                  if (webView != null
+                          &&
                       webView.canGoBack()) {
 
                       webView.goBack();
@@ -389,10 +358,10 @@ jobs:
         run: gradle assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk meinETA-v1.1.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk meinETA-v1.2.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: meinETA-v1.1-APK
-          path: meinETA-v1.1.apk
+          name: meinETA-v1.2-APK
+          path: meinETA-v1.2.apk
